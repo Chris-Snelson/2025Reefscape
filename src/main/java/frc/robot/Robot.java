@@ -1,134 +1,177 @@
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
+
 package frc.robot;
 
-import java.io.File;
-import java.nio.file.Paths;
-
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.DataLogManager;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Command;
+
+import java.io.File;
+import java.nio.file.Paths;
+
+import javax.sound.sampled.Port;
+
 import edu.wpi.first.net.PortForwarder;
 import edu.wpi.first.net.WebServer;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTable;
 
 import frc.robot.Constants;
-import frc.robot.lib.ElasticLib;
-import frc.robot.lib.Notification;
-import frc.robot.lib.NotificationLevel;
-import frc.robot.subsystems.RobotContainer;
+import frc.robot.RobotContainer;
+import frc.robot.util.Elastic;
+import frc.robot.util.Elastic.Notification;
+import frc.robot.util.Elastic.Notification.NotificationLevel;
+import com.ctre.phoenix6.SignalLogger;
 
+/**
+ * The methods in this class are called automatically corresponding to each
+ * mode, as described in
+ * the TimedRobot documentation. If you change the name of this class or the
+ * package after creating
+ * this project, you must also update the Main.java file in the project.
+ */
 public class Robot extends TimedRobot {
+  private RobotContainer container;
+  private NetworkTable dashboardNt;
+  private NetworkTableEntry matchTimePub;
 
-    private RobotContainer container;
-    private NetworkTableInstance dashboardNt;
-    private NetworkTableInstance.FloatPublisher matchTimePub;
+  private static final String kDefaultAuto = "Default";
+  private static final String kCustomAuto = "My Auto";
+  private String m_autoSelected;
+  private final SendableChooser<String> m_chooser = new SendableChooser<>();
 
-    public Robot() {
-        super(0.02);
+  /**
+   * This function is run when the robot is first started up and should be used
+   * for any
+   * initialization code.
+   */
+  public Robot() {
+    super(0.02);
 
-        DriverStation.silenceJoystickConnectionWarning(!DriverStation.isFMSAttached());
-        container = new RobotContainer();
+    DriverStation.silenceJoystickConnectionWarning(!DriverStation.isFMSAttached());
+    container = new RobotContainer();
 
-        SignalLogger.enableAutoLogging(DriverStation.isFMSAttached());
-        DataLogManager.start(0.2);
-        DriverStation.startDataLog(DataLogManager.getLog());
+    SignalLogger.enableAutoLogging(DriverStation.isFMSAttached());
+    DataLogManager.start(null, null, 0.2);
+    DriverStation.startDataLog(DataLogManager.getLog());
 
-        WebServer.getInstance().start(5800, getDeployDirectory());
-        PortForwarder portForwarder = PortForwarder.getInstance();
-        for (int i = 0; i < 10; i++) { // Forward limelight ports for use when tethered at events.
-            portForwarder.add(5800 + i, Constants.VisionConstants.FRONT_CENTER + ".local", 5800 + i);
-            portForwarder.add(5800 + i + 10, Constants.VisionConstants.BACK_CENTER + ".local", 5800 + i);
-        }
-
-        DataLogManager.log("Robot initialized");
-
-        dashboardNt = NetworkTableInstance.getDefault().getTable("Elastic");
-        matchTimePub = dashboardNt.getFloatTopic("Match Time").publish();
+    WebServer.start(5800, getDeployDirectory());
+    for (int i = 0; i < 10; i++) { // Forward limelight ports for use when tethered at events.
+      PortForwarder.add(5800 + i, Constants.VisionConstants.FRONT_CENTER + ".local", 5800 + i);
+      PortForwarder.add(5800 + i + 10, Constants.VisionConstants.BACK_CENTER + ".local", 5800 + i);
     }
 
-    private static String getDeployDirectory() {
-        if (new File("/home/lvuser").exists()) {
-            return "/home/lvuser/py/deploy";
-        } else {
-            return Paths.get(System.getProperty("user.dir"), "deploy").toString();
-        }
+    DataLogManager.log("Robot initialized");
+
+    dashboardNt = NetworkTableInstance.getDefault().getTable("Elastic");
+    matchTimePub = dashboardNt.getEntry("Match Time");
+  }
+
+  private static String getDeployDirectory() {
+    if (new File("/home/lvuser").exists()) {
+      return "/home/lvuser/py/deploy";
+    } else {
+      return Paths.get(System.getProperty("user.dir"), "deploy").toString();
     }
+  }
 
-    @Override
-    public void robotPeriodic() {
-        matchTimePub.set(Timer.getMatchTime());
+  /**
+   * This function is called every 20 ms, no matter the mode. Use this for items
+   * like diagnostics
+   * that you want ran during disabled, autonomous, teleoperated and test.
+   *
+   * <p>
+   * This runs after the mode specific periodic functions, but before LiveWindow
+   * and
+   * SmartDashboard integrated updating.
+   */
+  @Override
+  public void robotPeriodic() {
+  }
+
+  /**
+   * This autonomous (along with the chooser code above) shows how to select
+   * between different
+   * autonomous modes using the dashboard. The sendable chooser code works with
+   * the Java
+   * SmartDashboard. If you prefer the LabVIEW Dashboard, remove all of the
+   * chooser code and
+   * uncomment the getString line to get the auto name from the text box below the
+   * Gyro
+   *
+   * <p>
+   * You can add additional auto modes by adding additional comparisons to the
+   * switch structure
+   * below with additional strings. If using the SendableChooser make sure to add
+   * them to the
+   * chooser code above as well.
+   */
+  @Override
+  public void autonomousInit() {
+    m_autoSelected = m_chooser.getSelected();
+    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
+    System.out.println("Auto selected: " + m_autoSelected);
+  }
+
+  /** This function is called periodically during autonomous. */
+  @Override
+  public void autonomousPeriodic() {
+    switch (m_autoSelected) {
+      case kCustomAuto:
+        // Put custom auto code here
+        break;
+      case kDefaultAuto:
+      default:
+        // Put default auto code here
+        break;
     }
+  }
 
-    @Override
-    public void simulationPeriodic() {
-    }
+  /** This function is called once when teleop is enabled. */
+  @Override
+  public void teleopInit() {
+  }
 
-    @Override
-    public void autonomousInit() {
-        DataLogManager.log("Autonomous period started");
+  /** This function is called periodically during operator control. */
+  @Override
+  public void teleopPeriodic() {
+  }
 
-        Command selectedAuto = container.getAutonomousCommand();
-        if (selectedAuto != null) {
-            DataLogManager.log("Selected Auto: " + selectedAuto.getName());
-            selectedAuto.schedule();
-        }
+  /** This function is called once when the robot is disabled. */
+  @Override
+  public void disabledInit() {
+  }
 
-        ElasticLib.selectTab("Autonomous");
-    }
+  /** This function is called periodically when disabled. */
+  @Override
+  public void disabledPeriodic() {
+  }
 
-    @Override
-    public void autonomousPeriodic() {
-    }
+  /** This function is called once when test mode is enabled. */
+  @Override
+  public void testInit() {
+  }
 
-    @Override
-    public void autonomousExit() {
-        DataLogManager.log("Autonomous period ended");
-        ElasticLib.selectTab("Teleop");
-    }
+  /** This function is called periodically during test mode. */
+  @Override
+  public void testPeriodic() {
+  }
 
-    @Override
-    public void teleopInit() {
-        DataLogManager.log("Teleoperated period started");
-    }
+  /** This function is called once when the robot is first started up. */
+  @Override
+  public void simulationInit() {
+  }
 
-    @Override
-    public void teleopExit() {
-        DataLogManager.log("Teleoperated period ended");
-        if (DriverStation.isFMSAttached()) {
-            ElasticLib.sendNotification(
-                new Notification(
-                    NotificationLevel.INFO.value(),
-                    "Good match!",
-                    DriverStation.getReplayNumber() > 1 ? "(again)" : ""
-                )
-            );
-        }
-    }
-
-    @Override
-    public void testInit() {
-        DataLogManager.log("Test period started");
-        CommandScheduler.getInstance().cancelAll();
-        ElasticLib.selectTab("Debug");
-    }
-
-    @Override
-    public void disabledInit() {
-        SignalLogger.stop();
-    }
-
-    @Override
-    public void testExit() {
-        DataLogManager.log("Test period ended");
-    }
-
-    @Override
-    public void disabledPeriodic() {
-    }
-
-    @Override
-    public void teleopPeriodic() {
-    }
+  /** This function is called periodically whilst in simulation. */
+  @Override
+  public void simulationPeriodic() {
+  }
 }
