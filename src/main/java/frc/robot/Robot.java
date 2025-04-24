@@ -6,17 +6,14 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.Timer;
+
 import edu.wpi.first.wpilibj.DataLogManager;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.Command;
+
 
 import java.io.File;
 import java.nio.file.Paths;
 
-import javax.sound.sampled.Port;
 
 import edu.wpi.first.net.PortForwarder;
 import edu.wpi.first.net.WebServer;
@@ -24,12 +21,8 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTable;
 
-import frc.robot.Constants;
-import frc.robot.RobotContainer;
-import frc.robot.util.Elastic;
-import frc.robot.util.Elastic.Notification;
-import frc.robot.util.Elastic.Notification.NotificationLevel;
 import com.ctre.phoenix6.SignalLogger;
+import edu.wpi.first.wpilibj2.command.Command;
 
 /**
  * The methods in this class are called automatically corresponding to each
@@ -116,7 +109,15 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void autonomousInit() {
+    DataLogManager.log("Autonomous period started");
     m_autoSelected = m_chooser.getSelected();
+    Command selectedAuto = container.getAutonomousCommand();
+    if (selectedAuto != null) {
+      DataLogManager.log("Selected Auto: " + selectedAuto.getName());
+      selectedAuto.schedule();
+    }
+
+    dashboardNt.getEntry("Selected Tab").setString("Autonomous");
     // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
     System.out.println("Auto selected: " + m_autoSelected);
   }
